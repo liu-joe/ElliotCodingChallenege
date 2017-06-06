@@ -1,3 +1,25 @@
+/**
+ * Elliot Technologies Coding Challenge
+ * Event Scheduler
+ *
+ * By: Zhenyu Liu
+ * Email: z324liu@uwaterloo.ca
+ *
+ * ==============================
+ * OVERVIEW
+ * ==============================
+ *
+ * This app takes a series of input (representing meetings), and determines the longest block of time between 8 am
+ * to 10 pm in which all users are free to meet within the next 7 days
+ *
+ * Since we are looking for a block of time in which ALL users are free, the user id information is ignored as it
+ * is irrelevant to the problem
+ *
+ * The algorithm involves a linked list in which each node represents a "busy zone", busy zones are time slots in which
+ * meetings are not schedule-able, this includes when at least 1 user is in a meeting or when the time is between
+ * 10 pm to 8 am
+ */
+
 package com.joeliu;
 
 import java.io.BufferedReader;
@@ -18,6 +40,8 @@ public class EventScheduler {
 		nodes = new LinkedList<>();
 		final String filename = "calendar.csv";
 
+		// Set the boundaries of our search, startTime is when the program is run, and endTime is 7 days from
+		// the start at end-of-day
 		Calendar c = Calendar.getInstance();
 		c.setTime(new Date());
 		startTime = c.getTimeInMillis();
@@ -27,8 +51,10 @@ public class EventScheduler {
 		c.set(Calendar.SECOND, 0);
 		endTime = c.getTimeInMillis();
 
+		// Fill in all hours between 10pm to 8am to avoid finding meeting time out of business hours
 		fillOffHours();
 
+		// Read all data entries from csv file and process their meeting times
 		BufferedReader fileReader;
 		try {
 			String line;
@@ -40,14 +66,17 @@ public class EventScheduler {
 					throw new RuntimeException(line + " is expected to have 3 values");
 				}
 
+				// create a node of time to represent a meeting
 				Node node = createNode(getUnixTime(tokens[1]), getUnixTime(tokens[2]));
+				// add the node and merge any potentially overlapping nodes in the linked list
 				addAndMerge(node);
 			}
 		} catch (Exception e) {
-
+			System.err.println("Error reading file: " + filename);
+			throw new RuntimeException(e);
 		}
 
-		System.out.println(String.format("Time periods in which someone is busy: %s", nodes));
+		// Determine the longest gap available, and output the result
 		System.out.println(String.format("The longest empty gap takes place between: %s", getLongestGap()));
 	}
 
@@ -82,6 +111,7 @@ public class EventScheduler {
 		do {
 			initialSize = nodes.size();
 			for (int idx = 0; idx < nodes.size() - 1; ++idx) {
+				// if there is overlap between 2 nodes, combine them into 1
 				if (nodes.get(idx).end >= nodes.get(idx + 1).start) {
 					nodes.get(idx).end = nodes.get(idx).end > nodes.get(idx + 1).end ?
 							nodes.get(idx).end : nodes.get(idx + 1).end;
@@ -89,6 +119,7 @@ public class EventScheduler {
 					break;
 				}
 			}
+		//repeat this process until nodes has no more overlaps
 		} while (initialSize != nodes.size());
 	}
 
@@ -101,13 +132,16 @@ public class EventScheduler {
 		c.set(Calendar.HOUR_OF_DAY, 8);
 		c.set(Calendar.MINUTE, 0);
 		c.set(Calendar.SECOND, 0);
+		// If program is run before 8 am, mark the period until 8 am to be un-schedule-able
 		if (startTime < c.getTimeInMillis()) {
 			addAndMerge(createNode(startTime, c.getTimeInMillis()));
 		}
 
 		boolean reachEndDate = false;
+		// Mark all the "off hours" between 10 pm to 8 am to be un-schedule-able
 		while (!reachEndDate) {
 			c.set(Calendar.HOUR_OF_DAY, 22);
+			// If program is run after 10pm, mark this day un-schedule-able from current time instead of 10 pm
 			if (startTime > c.getTimeInMillis()) {
 				c.setTime(new Date(startTime));
 			}
@@ -143,6 +177,7 @@ public class EventScheduler {
 
 	private static Node createNode(long start, long end) {
 		long time1, time2;
+		// When we create a new node, we cut off any time that is not within the boundaries of our search
 		time1 = start > endTime ? endTime : start;
 		time2 = end > endTime ? endTime : end;
 		time1 = time1 < startTime ? startTime : time1;
@@ -150,6 +185,9 @@ public class EventScheduler {
 		return new EventScheduler(). new Node(time1, time2);
 	}
 
+	/**
+	 * Class to represent a block of time
+	 */
 	private class Node {
 		long start;
 		long end;
